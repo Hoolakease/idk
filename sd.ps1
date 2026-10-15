@@ -15,92 +15,105 @@ public class Mem {
     }
 }
 "@
-function Get-Javaw { Get-Process javaw -ErrorAction SilentlyContinue | Select-Object -First 1 }
-$targets = @(
-    'slinky','Slinky','SLINKY','slink','Slink','SLINK',
-    'dev.slinky','dev/slinky','slinkysemantic','SlinkyNative','Slinky-Native','slinky-na',
-    'OpenSlinky','OpenSlinky-main','C:/Users/michi/Documents/OpenSlinky',
-    'C:\Users\michi\Documents\OpenSlinky',
-    'autoclicker','AutoClicker','Aim Assist','Backtrack','backtrack',
-    'Hit Select','hitselect','Knockback Delay','Lag Range','lagrange',
+$procs = Get-Process javaw -ErrorAction SilentlyContinue
+if (-not $procs) { Write-Host 'no javaw.'; exit 1 }
+# short needles - catch mangled/obfuscated variants too
+$needles = @(
+    'slink','Slink','SLINK','slikny','sl1nky',
+    'dev.slinky','dev/slinky','SlinkyMod','SlinkyNative','slinky-na','OpenSlinky',
+    'autoclick','clicker','Aim Assist','aimassist','Backtrack','backtrack',
+    'Hit Select','hitselect','Knockback','knockback','Lag Range','lagrange',
     'Reach','reach','Timer Range','timerrange','Weapons','weapons',
-    'Auto Block','autoblock','Auto Weapon','autoweapon','Criticals','criticals',
-    'Hitboxes','hitboxes','Knockback Displace','Piercing','piercing',
-    'Sprint Reset','sprintreset','Velocity','velocity',
-    'Fast Accel','fastaccel','Inv Walk','invwalk','No Jump Delay',
-    'Null Move','nullmove','Sprint','sprint','Instant Stop','instantstop',
-    'Keep Sprint','keepsprint','No Slow','noslow','Safe Walk','safewalk',
-    'Strafe','strafe','Anti Debuff','antidebuff','Chams','chams',
-    'Free Look','freelook','Indicators','indicators','Mod Overlay','modoverlay',
-    'No Hurt Cam','nohurtcam','Player ESP','playeresp','Trajectories','trajectories',
-    'Block ESP','blockesp','Chest ESP','chestesp','GUI','Graphical interface for the cheat',
-    'Item ESP','itemesp','Name Tags','nametags','Notifications','notifications',
-    'Pointers','pointers','Auto Tool','autotool','Bridge Assist','bridgeassist',
-    'Fast Mine','fastmine','Ghost Hand','ghosthand','Block In','blockin',
-    'Clutch','clutch','Fast Place','fastplace','FastPlaceModule','BridgeAssistModule','AutoToolModule',
+    'Auto Block','autoblock','Auto Weapon','autoweapon','Critical','critical','crits',
+    'Hitbox','hitbox','Pierc','pierc','Sprint Reset','sprintreset',
+    'Veloc','veloc','Fast Accel','fastaccel','Inv Walk','invwalk',
+    'No Jump','nojump','Null Move','nullmove','Sprint','sprint',
+    'Instant Stop','instantstop','Keep Sprint','keepsprint',
+    'No Slow','noslow','Safe Walk','safewalk','Strafe','strafe',
+    'Anti Debuff','antidebuff','Chams','chams','Free Look','freelook',
+    'Indicator','indicator','Mod Overlay','modoverlay','No Hurt','nohurt',
+    'Player ESP','playeresp','Trajector','trajector','Block ESP','blockesp',
+    'Chest ESP','chestesp','Item ESP','itemesp','Name Tag','nametag',
+    'Notificat','notificat','Pointer','pointer','Auto Tool','autotool',
+    'Bridge Assist','bridgeassist','Fast Mine','fastmine','Ghost Hand','ghosthand',
+    'Block In','blockin','Clutch','clutch','Fast Place','fastplace',
     'Anti Bot','antibot','Auto Rod','autorod','Blink','blink',
     'Fake Lag','fakelag','Inv Manager','invmanager','No Hit Delay','nohitdelay',
-    'No Use Delay','nousedelay','Refill','refill','RefillModule','Timer','timer',
-    'Auto Pot','autopot','Auto Soup','autosoup','AutoSoy','Debug','debug',
-    'Friends','friends','Item Use Fix','No Item Release','Ping Fix','pingfix',
-    'Teams','teams','Combat','Profiles','Unload',
-    'dev.slinky.SlinkyMod','MethodNode','TypeAnnotationNode','InsnList',
-    'dev.slinky.shaded.asm','dev.slinky.setting.Setting','dev.slinky.module'
+    'No Use Delay','nousedelay','Refill','refill','Timer','timer',
+    'Auto Pot','autopot','Auto Soup','autosoup','Debug','debug',
+    'Friends','friends','No Item Release','noitemrelease','Ping Fix','pingfix',
+    'Teams','teams','Combat','Profiles','Unload','MethodNode','InsnList',
+    'shaded.asm','setting.Setting','module.world','module.utility','module.combat',
+    'FastPlaceModule','BridgeAssistModule','AutoToolModule','RefillModule'
 )
-$tb = foreach ($t in $targets) { [Text.Encoding]::ASCII.GetBytes($t) }
-$tb16 = foreach ($t in $targets) { [Text.Encoding]::Unicode.GetBytes($t) }
-$p = Get-Javaw
-if (-not $p) { Write-Host 'javaw.exe not running.'; exit 1 }
-$h = [Mem]::OpenProcess(0x1F0FFF, $false, $p.Id)
-if ($h -eq [IntPtr]::Zero) { Write-Host 'OpenProcess failed. Run as admin.'; exit 1 }
-$wiped = 0; $regions = 0; $scanned = 0
-$mbi = New-Object Mem+MBI
-$addr = [Int64]0
-$max = [Int64]0x7FFFFFFFFFFF
-$sz = [Runtime.InteropServices.Marshal]::SizeOf($mbi)
-while ($addr -lt $max) {
-    $r = [Mem]::VirtualQueryEx($h, [IntPtr]$addr, [ref]$mbi, [uint32]$sz)
-    if ($r -eq 0) { break }
-    $base = $mbi.BaseAddress.ToInt64()
-    $rsize = $mbi.RegionSize.ToInt64()
-    if ($rsize -le 0) { $addr = $base + 0x1000; continue }
-    if ($mbi.State -eq 0x1000 -and $rsize -lt 256MB) {
-        $scanned++
-        $buf = New-Object byte[] $rsize
-        [UIntPtr]$rd = [UIntPtr]::Zero
-        if ([Mem]::ReadProcessMemory($h, $mbi.BaseAddress, $buf, [UIntPtr]$rsize, [ref]$rd)) {
-            $n = $rd.ToUInt64()
-            if ($n -gt 0) {
+$tb = foreach ($t in $needles) { [Text.Encoding]::ASCII.GetBytes($t) }
+# lowercase-folded copies for case-insensitive hit
+$tbl = foreach ($t in $needles) { [Text.Encoding]::ASCII.GetBytes($t.ToLower()) }
+$tb16 = foreach ($t in $needles) { [Text.Encoding]::Unicode.GetBytes($t) }
+$tb16l = foreach ($t in $needles) { [Text.Encoding]::Unicode.GetBytes($t.ToLower()) }
+$totalWiped = 0; $totalRegions = 0
+foreach ($p in $procs) {
+    Write-Host ('pid ' + $p.Id + ' ...')
+    $h = [Mem]::OpenProcess(0x1F0FFF, $false, $p.Id)
+    if ($h -eq [IntPtr]::Zero) { Write-Host ' open failed (admin?)'; continue }
+    $mbi = New-Object Mem+MBI
+    $addr = [Int64]0
+    $max = [Int64]0x7FFFFFFFFFFF
+    $sz = [Runtime.InteropServices.Marshal]::SizeOf($mbi)
+    $wiped = 0; $regions = 0; $scanned = 0
+    while ($addr -lt $max) {
+        $r = [Mem]::VirtualQueryEx($h, [IntPtr]$addr, [ref]$mbi, [uint32]$sz)
+        if ($r -eq 0) { break }
+        $base = $mbi.BaseAddress.ToInt64()
+        $rsize = $mbi.RegionSize.ToInt64()
+        if ($rsize -le 0 -or $rsize -gt 256MB) { $addr = $base + 0x10000; if ($addr -le $base) { break }; continue }
+        if ($mbi.State -eq 0x1000) {
+            $scanned++
+            $n = [UInt64]$rsize
+            $buf = New-Object byte[] $rsize
+            [UIntPtr]$rd = [UIntPtr]::Zero
+            $ok = $false
+            try { $ok = [Mem]::ReadProcessMemory($h, $mbi.BaseAddress, $buf, [UIntPtr]$n, [ref]$rd) } catch {}
+            $got = 0
+            try { $got = [UInt64]$rd } catch { $got = 0 }
+            if ($ok -and $got -gt 0) {
+                # lowercase-fold buffer copy for insensitive pass
+                $low = New-Object byte[] $got
+                for ($k = 0; $k -lt $got; $k++) { $b = $buf[$k]; if ($b -ge 65 -and $b -le 90) { $low[$k] = $b + 32 } else { $low[$k] = $b } }
                 $dirty = $false
                 foreach ($pat in $tb) {
-                    $L = $pat.Length
-                    for ($i = 0; $i + $L -le $n; $i++) {
+                    $L = $pat.Length; if ($L -lt 3) { continue }
+                    for ($i = 0; $i + $L -le $got; $i++) {
+                        if ($buf[$i] -ne $pat[0]) { continue }
                         $hit = $true
-                        for ($j = 0; $j -lt $L; $j++) { if ($buf[$i+$j] -ne $pat[$j]) { $hit = $false; break } }
-                        if ($hit) { for ($j = 0; $j -lt $L; $j++) { $buf[$i+$j] = 0 }; $dirty = $true; $wiped++; $i += $L - 1 }
+                        for ($j = 1; $j -lt $L; $j++) { if ($buf[$i+$j] -ne $pat[$j]) { $hit = $false; break } }
+                        if ($hit) { for ($j = 0; $j -lt $L; $j++) { $buf[$i+$j] = 0 }; $dirty = $true; $wiped++ }
                     }
                 }
-                foreach ($pat in $tb16) {
-                    $L = $pat.Length
-                    for ($i = 0; $i + $L -le $n; $i++) {
+                foreach ($pat in $tbl) {
+                    $L = $pat.Length; if ($L -lt 3) { continue }
+                    for ($i = 0; $i + $L -le $got; $i++) {
+                        if ($low[$i] -ne $pat[0]) { continue }
                         $hit = $true
-                        for ($j = 0; $j -lt $L; $j++) { if ($buf[$i+$j] -ne $pat[$j]) { $hit = $false; break } }
-                        if ($hit) { for ($j = 0; $j -lt $L; $j++) { $buf[$i+$j] = 0 }; $dirty = $true; $wiped++; $i += $L - 1 }
+                        for ($j = 1; $j -lt $L; $j++) { if ($low[$i+$j] -ne $pat[$j]) { $hit = $false; break } }
+                        if ($hit) { for ($j = 0; $j -lt $L; $j++) { $buf[$i+$j] = 0 }; $dirty = $true; $wiped++ }
                     }
                 }
                 if ($dirty) {
                     [uint32]$old = 0
-                    [Mem]::VirtualProtectEx($h, $mbi.BaseAddress, [UIntPtr]$n, 4, [ref]$old) | Out-Null
+                    try { [Mem]::VirtualProtectEx($h, $mbi.BaseAddress, [UIntPtr]$got, 4, [ref]$old) | Out-Null } catch {}
                     [UIntPtr]$wr = [UIntPtr]::Zero
-                    [Mem]::WriteProcessMemory($h, $mbi.BaseAddress, $buf, [UIntPtr]$n, [ref]$wr) | Out-Null
-                    [Mem]::VirtualProtectEx($h, $mbi.BaseAddress, [UIntPtr]$n, $old, [ref]$old) | Out-Null
+                    try { [Mem]::WriteProcessMemory($h, $mbi.BaseAddress, $buf, [UIntPtr]$got, [ref]$wr) | Out-Null } catch {}
+                    try { [Mem]::VirtualProtectEx($h, $mbi.BaseAddress, [UIntPtr]$got, $old, [ref]$old) | Out-Null } catch {}
                     $regions++
                 }
             }
         }
+        $addr = $base + $rsize
+        if ($addr -le $base) { break }
     }
-    $addr = $base + $rsize
-    if ($addr -le $base) { break }
+    [Mem]::CloseHandle($h) | Out-Null
+    Write-Host (' pid ' + $p.Id + ': scanned ' + $scanned + ' wiped ' + $wiped + ' in ' + $regions)
+    $totalWiped += $wiped; $totalRegions += $regions
 }
-[Mem]::CloseHandle($h) | Out-Null
-Write-Host "scanned $scanned regions. wiped $wiped hits in $regions regions."
+Write-Host ('TOTAL wiped ' + $totalWiped + ' in ' + $totalRegions)
