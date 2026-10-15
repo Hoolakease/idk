@@ -15,105 +15,132 @@ public class Mem {
     }
 }
 "@
-$procs = Get-Process javaw -ErrorAction SilentlyContinue
-if (-not $procs) { Write-Host 'no javaw.'; exit 1 }
-# short needles - catch mangled/obfuscated variants too
-$needles = @(
-    'slink','Slink','SLINK','slikny','sl1nky',
-    'dev.slinky','dev/slinky','SlinkyMod','SlinkyNative','slinky-na','OpenSlinky',
-    'autoclick','clicker','Aim Assist','aimassist','Backtrack','backtrack',
-    'Hit Select','hitselect','Knockback','knockback','Lag Range','lagrange',
-    'Reach','reach','Timer Range','timerrange','Weapons','weapons',
-    'Auto Block','autoblock','Auto Weapon','autoweapon','Critical','critical','crits',
-    'Hitbox','hitbox','Pierc','pierc','Sprint Reset','sprintreset',
-    'Veloc','veloc','Fast Accel','fastaccel','Inv Walk','invwalk',
-    'No Jump','nojump','Null Move','nullmove','Sprint','sprint',
-    'Instant Stop','instantstop','Keep Sprint','keepsprint',
-    'No Slow','noslow','Safe Walk','safewalk','Strafe','strafe',
-    'Anti Debuff','antidebuff','Chams','chams','Free Look','freelook',
-    'Indicator','indicator','Mod Overlay','modoverlay','No Hurt','nohurt',
-    'Player ESP','playeresp','Trajector','trajector','Block ESP','blockesp',
-    'Chest ESP','chestesp','Item ESP','itemesp','Name Tag','nametag',
-    'Notificat','notificat','Pointer','pointer','Auto Tool','autotool',
-    'Bridge Assist','bridgeassist','Fast Mine','fastmine','Ghost Hand','ghosthand',
-    'Block In','blockin','Clutch','clutch','Fast Place','fastplace',
-    'Anti Bot','antibot','Auto Rod','autorod','Blink','blink',
-    'Fake Lag','fakelag','Inv Manager','invmanager','No Hit Delay','nohitdelay',
-    'No Use Delay','nousedelay','Refill','refill','Timer','timer',
-    'Auto Pot','autopot','Auto Soup','autosoup','Debug','debug',
-    'Friends','friends','No Item Release','noitemrelease','Ping Fix','pingfix',
-    'Teams','teams','Combat','Profiles','Unload','MethodNode','InsnList',
-    'shaded.asm','setting.Setting','module.world','module.utility','module.combat',
-    'FastPlaceModule','BridgeAssistModule','AutoToolModule','RefillModule'
+function Get-Javaw { Get-Process javaw -ErrorAction SilentlyContinue | Select-Object -First 1 }
+$targets = @(
+    'slinky','Slinky','SLINKY','slink','Slink','SLINK',
+    'Aim Assist','Pulls your crosshair towards other players',
+    'Auto Clicker','autoclicker','AutoClicker','auto_clicker','Clicks for you when holding down left-click',
+    'Backtrack','backtrack','Uses lag to make players easier to hit',
+    'Hit Select','hitselect','hit_select','Perfectly times your hits',
+    'Knockback Delay','knockbackdelay','knockback_delay','Delays your knockback in certain scenarios',
+    'Lag Range','lagrange','lag_range','Uses lag to stay out of target range',
+    'Reach','reach','Increases your melee range',
+    'Timer Range','timerrange','timer_range','Abuses timer lag to teleport you',
+    'Weapons','weapons','Configure which items are considered weapons',
+    'Auto Block','autoblock','auto_block','Blocks your sword for you in combat',
+    'Auto Weapon','autoweapon','auto_weapon','Selects your weapon when aiming on players',
+    'Criticals','criticals','crits','Increases chance of landing critical hits',
+    'Hitboxes','hitboxes','Expands hitboxes of other players',
+    'Knockback Displace','knockbackdisplace','Allows dealing knockback at a different angle',
+    'Piercing','piercing','Allows hitting entities through obstructions',
+    'Sprint Reset','sprintreset','sprint_reset','Resets your sprint state to deal more knockback',
+    'Velocity','velocity','Reduces the amount of knockback you take',
+    'Fast Accel','fastaccel','Speeds up acceleration',
+    'Inv Walk','invwalk','inv_walk','Allows moving in inventory',
+    'No Jump Delay','nojumpdelay','Removes cooldown when holding jump key',
+    'Null Move','nullmove','Makes it easier to switch move direction instantly',
+    'Sprint','sprint','Automatically sprints for you',
+    'Instant Stop','instantstop','Instantly stops moving when move keys are released',
+    'Keep Sprint','keepsprint','Keeps your sprint speed when attacking players',
+    'No Slow','noslow','no_slow','Removes slowdown while using items',
+    'Safe Walk','safewalk','safe_walk','Prevents you from walking off ledges',
+    'Strafe','strafe','Allows faster strafing',
+    'Anti Debuff','antidebuff','Removes negative visual effects',
+    'Chams','chams','Renders players behind blocks',
+    'Free Look','freelook','free_look','Freely move the camera around',
+    'Indicators','indicators','Points to incoming projectiles',
+    'Mod Overlay','modoverlay','Displays a list of all active mods',
+    'No Hurt Cam','nohurtcam','Removes camera shake when taking damage',
+    'Player ESP','playeresp','player_esp','Highlights other players',
+    'Trajectories','trajectories','Predicts the trajectory of the item in your hand',
+    'Block ESP','blockesp','block_esp','Highlights blocks',
+    'Chest ESP','chestesp','chest_esp','Highlights chests',
+    'GUI','Graphical interface for the cheat',
+    'Item ESP','itemesp','item_esp','Highlights dropped items',
+    'Name Tags','nametags','name_tags','Makes player name tags easier to see',
+    'Notifications','notifications','Informs you when certain actions are performed',
+    'Pointers','pointers','Points to other players',
+    'Auto Tool','autotool','Selects the best tool when digging',
+    'Bridge Assist','bridgeassist','Sneaks and unsneaks for you while bridging',
+    'Fast Mine','fastmine','Increases block mining speed',
+    'Ghost Hand','ghosthand','Allows interacting with blocks through entities',
+    'Block In','blockin','Places blocks around you',
+    'Clutch','clutch','Clutches for you when falling',
+    'Fast Place','fastplace','Allows placing blocks faster',
+    'Anti Bot','antibot','anti_bot','Ignores NPCs for specific modules',
+    'Auto Rod','autorod','Throws your fishing rod for you',
+    'Blink','blink','Simulates teleporting using lag',
+    'Fake Lag','fakelag','fake_lag','Adds an artificial delay to your packets',
+    'Inv Manager','invmanager','inv_manager','Organises your inventory for you',
+    'No Hit Delay','nohitdelay','Removes 1.8 swing delay',
+    'No Use Delay','nousedelay','Removes vanilla delay when consuming items',
+    'Refill','refill','Automatically moves items into your hotbar',
+    'Timer','timer','Modifies the speed the game runs at',
+    'Auto Pot','autopot','Uses healing potions for you',
+    'Auto Soup','autosoup','Uses soups for you',
+    'Debug','debug','Prints debug information in chat',
+    'Friends','friends','Lets you mark other players as friendly',
+    'Item Use Fix','itemusefix','Allows using items while breaking blocks',
+    'No Item Release','noitemrelease','Hides item release from server',
+    'Ping Fix','pingfix','Shows your real ping while using lag mods',
+    'Teams','teams','Ignores teammates for specific modules',
+    'Combat','Profiles','Unload'
 )
-$tb = foreach ($t in $needles) { [Text.Encoding]::ASCII.GetBytes($t) }
-# lowercase-folded copies for case-insensitive hit
-$tbl = foreach ($t in $needles) { [Text.Encoding]::ASCII.GetBytes($t.ToLower()) }
-$tb16 = foreach ($t in $needles) { [Text.Encoding]::Unicode.GetBytes($t) }
-$tb16l = foreach ($t in $needles) { [Text.Encoding]::Unicode.GetBytes($t.ToLower()) }
-$totalWiped = 0; $totalRegions = 0
-foreach ($p in $procs) {
-    Write-Host ('pid ' + $p.Id + ' ...')
-    $h = [Mem]::OpenProcess(0x1F0FFF, $false, $p.Id)
-    if ($h -eq [IntPtr]::Zero) { Write-Host ' open failed (admin?)'; continue }
-    $mbi = New-Object Mem+MBI
-    $addr = [Int64]0
-    $max = [Int64]0x7FFFFFFFFFFF
-    $sz = [Runtime.InteropServices.Marshal]::SizeOf($mbi)
-    $wiped = 0; $regions = 0; $scanned = 0
-    while ($addr -lt $max) {
-        $r = [Mem]::VirtualQueryEx($h, [IntPtr]$addr, [ref]$mbi, [uint32]$sz)
-        if ($r -eq 0) { break }
-        $base = $mbi.BaseAddress.ToInt64()
-        $rsize = $mbi.RegionSize.ToInt64()
-        if ($rsize -le 0 -or $rsize -gt 256MB) { $addr = $base + 0x10000; if ($addr -le $base) { break }; continue }
-        if ($mbi.State -eq 0x1000) {
-            $scanned++
-            $n = [UInt64]$rsize
-            $buf = New-Object byte[] $rsize
-            [UIntPtr]$rd = [UIntPtr]::Zero
-            $ok = $false
-            try { $ok = [Mem]::ReadProcessMemory($h, $mbi.BaseAddress, $buf, [UIntPtr]$n, [ref]$rd) } catch {}
-            $got = 0
-            try { $got = [UInt64]$rd } catch { $got = 0 }
-            if ($ok -and $got -gt 0) {
-                # lowercase-fold buffer copy for insensitive pass
-                $low = New-Object byte[] $got
-                for ($k = 0; $k -lt $got; $k++) { $b = $buf[$k]; if ($b -ge 65 -and $b -le 90) { $low[$k] = $b + 32 } else { $low[$k] = $b } }
+$tb = foreach ($t in $targets) { [Text.Encoding]::ASCII.GetBytes($t); [Text.Encoding]::UTF8.GetBytes($t) | Out-Null }
+$tb = foreach ($t in $targets) { [Text.Encoding]::ASCII.GetBytes($t) }
+# also build UTF-16LE (Java/JVM strings live wide half the time)
+$tb16 = foreach ($t in $targets) { [Text.Encoding]::Unicode.GetBytes($t) }
+$p = Get-Javaw
+if (-not $p) { Write-Host 'javaw.exe not running.'; exit 1 }
+$h = [Mem]::OpenProcess(0x1F0FFF, $false, $p.Id)
+if ($h -eq [IntPtr]::Zero) { Write-Host 'OpenProcess failed. Run as admin.'; exit 1 }
+$wiped = 0; $regions = 0
+$mbi = New-Object Mem+MBI
+$addr = [Int64]0
+$max = [Int64]0x7FFFFFFFFFFF
+$sz = [Runtime.InteropServices.Marshal]::SizeOf($mbi)
+while ($addr -lt $max) {
+    $r = [Mem]::VirtualQueryEx($h, [IntPtr]$addr, [ref]$mbi, [uint32]$sz)
+    if ($r -eq 0) { break }
+    $base = $mbi.BaseAddress.ToInt64()
+    $rsize = $mbi.RegionSize.ToInt64()
+    if ($rsize -le 0) { $addr = $base + 0x1000; continue }
+    if ($mbi.State -eq 0x1000 -and $mbi.Type -eq 0x20000 -and $rsize -lt 256MB) {
+        $buf = New-Object byte[] $rsize
+        [UIntPtr]$rd = [UIntPtr]::Zero
+        if ([Mem]::ReadProcessMemory($h, $mbi.BaseAddress, $buf, [UIntPtr]$rsize, [ref]$rd)) {
+            $n = $rd.ToUInt64()
+            if ($n -gt 0) {
                 $dirty = $false
                 foreach ($pat in $tb) {
-                    $L = $pat.Length; if ($L -lt 3) { continue }
-                    for ($i = 0; $i + $L -le $got; $i++) {
-                        if ($buf[$i] -ne $pat[0]) { continue }
+                    $L = $pat.Length
+                    for ($i = 0; $i + $L -le $n; $i++) {
                         $hit = $true
-                        for ($j = 1; $j -lt $L; $j++) { if ($buf[$i+$j] -ne $pat[$j]) { $hit = $false; break } }
-                        if ($hit) { for ($j = 0; $j -lt $L; $j++) { $buf[$i+$j] = 0 }; $dirty = $true; $wiped++ }
+                        for ($j = 0; $j -lt $L; $j++) { if ($buf[$i+$j] -ne $pat[$j]) { $hit = $false; break } }
+                        if ($hit) { for ($j = 0; $j -lt $L; $j++) { $buf[$i+$j] = 0 }; $dirty = $true; $wiped++; $i += $L - 1 }
                     }
                 }
-                foreach ($pat in $tbl) {
-                    $L = $pat.Length; if ($L -lt 3) { continue }
-                    for ($i = 0; $i + $L -le $got; $i++) {
-                        if ($low[$i] -ne $pat[0]) { continue }
+                foreach ($pat in $tb16) {
+                    $L = $pat.Length
+                    for ($i = 0; $i + $L -le $n; $i++) {
                         $hit = $true
-                        for ($j = 1; $j -lt $L; $j++) { if ($low[$i+$j] -ne $pat[$j]) { $hit = $false; break } }
-                        if ($hit) { for ($j = 0; $j -lt $L; $j++) { $buf[$i+$j] = 0 }; $dirty = $true; $wiped++ }
+                        for ($j = 0; $j -lt $L; $j++) { if ($buf[$i+$j] -ne $pat[$j]) { $hit = $false; break } }
+                        if ($hit) { for ($j = 0; $j -lt $L; $j++) { $buf[$i+$j] = 0 }; $dirty = $true; $wiped++; $i += $L - 1 }
                     }
                 }
                 if ($dirty) {
                     [uint32]$old = 0
-                    try { [Mem]::VirtualProtectEx($h, $mbi.BaseAddress, [UIntPtr]$got, 4, [ref]$old) | Out-Null } catch {}
+                    [Mem]::VirtualProtectEx($h, $mbi.BaseAddress, [UIntPtr]$n, 4, [ref]$old) | Out-Null
                     [UIntPtr]$wr = [UIntPtr]::Zero
-                    try { [Mem]::WriteProcessMemory($h, $mbi.BaseAddress, $buf, [UIntPtr]$got, [ref]$wr) | Out-Null } catch {}
-                    try { [Mem]::VirtualProtectEx($h, $mbi.BaseAddress, [UIntPtr]$got, $old, [ref]$old) | Out-Null } catch {}
+                    [Mem]::WriteProcessMemory($h, $mbi.BaseAddress, $buf, [UIntPtr]$n, [ref]$wr) | Out-Null
+                    [Mem]::VirtualProtectEx($h, $mbi.BaseAddress, [UIntPtr]$n, $old, [ref]$old) | Out-Null
                     $regions++
                 }
             }
         }
-        $addr = $base + $rsize
-        if ($addr -le $base) { break }
     }
-    [Mem]::CloseHandle($h) | Out-Null
-    Write-Host (' pid ' + $p.Id + ': scanned ' + $scanned + ' wiped ' + $wiped + ' in ' + $regions)
-    $totalWiped += $wiped; $totalRegions += $regions
+    $addr = $base + $rsize
+    if ($addr -le $base) { break }
 }
-Write-Host ('TOTAL wiped ' + $totalWiped + ' in ' + $totalRegions)
+[Mem]::CloseHandle($h) | Out-Null
+Write-Host "wiped $wiped hits in $regions regions."
